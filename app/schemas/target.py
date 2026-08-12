@@ -4,9 +4,9 @@ from pydantic import BaseModel
 
 class TargetCreate(BaseModel):
     url:str
-    method:str
+    method:str = "GET"
     expected_status:int=200
-    interval:int=30
+    interval_seconds:int = 30
     timeout:float= 5.0
 
 class TargetResponse(TargetCreate):
