@@ -60,6 +60,7 @@ select = [
 ]
 ignore = [
     "E501",  # line too long — пусть форматтер решает
+    "UP046", # generic class syntax
 ]
 
 [tool.ruff.lint.isort]
