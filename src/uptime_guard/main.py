@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+
 from uptime_guard.api.v1.target import router as targets_router
 
 app = FastAPI(title="UptimeGuard", version="0.1.0")
