@@ -11,14 +11,27 @@ from uptime_guard.schemas.target import TargetCreate, TargetResponse
 router = APIRouter(prefix="/targets", tags=["targets"])
 
 
+from uptime_guard.models.user import User
+from sqlalchemy import select
+
 @router.post("/", response_model=TargetResponse, status_code=status.HTTP_201_CREATED)
 async def create_target(
     body: TargetCreate,
     session: AsyncSession = Depends(get_session),
 ) -> Target:
     repo = TargetRepository(session)
-    # TODO
+    
+    result = await session.execute(select(User).limit(1))
+    user = result.scalars().first()
+    
+    if not user:
+        user = User(telegram_id=1, username="test_user")
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
     new_target = Target(
+        user_id=user.id,
         url=str(body.url),
         method=body.method,
         expected_status=body.expected_status,
