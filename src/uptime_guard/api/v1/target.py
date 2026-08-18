@@ -10,13 +10,14 @@ from uptime_guard.schemas.target import TargetCreate, TargetResponse
 
 router = APIRouter(prefix="/targets", tags=["targets"])
 
+
 @router.post("/", response_model=TargetResponse, status_code=status.HTTP_201_CREATED)
 async def create_target(
     body: TargetCreate,
     session: AsyncSession = Depends(get_session),
 ) -> Target:
     repo = TargetRepository(session)
-    #TODO
+    # TODO
     new_target = Target(
         url=str(body.url),
         method=body.method,
@@ -27,17 +28,16 @@ async def create_target(
     return await repo.create(new_target)
 
 
-
-@router.get("/", response_model = list[TargetResponse])
-async def get_targets(
-    session: AsyncSession = Depends(get_session)
-) -> list[Target]:
+@router.get("/", response_model=list[TargetResponse])
+async def get_targets(session: AsyncSession = Depends(get_session)) -> list[Target]:
     repo = TargetRepository(session)
     return await repo.list_all()
 
 
-@router.get("/{target_id}", response_model = TargetResponse)
-async def get_target_by_id(target_id:UUID, session: AsyncSession = Depends(get_session)) -> Target:
+@router.get("/{target_id}", response_model=TargetResponse)
+async def get_target_by_id(
+    target_id: UUID, session: AsyncSession = Depends(get_session)
+) -> Target:
     repo = TargetRepository(session)
     target = await repo.get_by_id(target_id)
     if not target:
@@ -45,8 +45,8 @@ async def get_target_by_id(target_id:UUID, session: AsyncSession = Depends(get_s
     return target
 
 
-@router.patch("/{target_id}",response_model = TargetResponse)
-async def update_target(target_id:UUID, session:AsyncSession= Depends(get_session)) -> Target:
+@router.patch("/{target_id}", response_model=TargetResponse)
+async def update_target(target_id: UUID, session: AsyncSession = Depends(get_session)) -> Target:
     repo = TargetRepository(session)
     target = await repo.get_by_id(target_id)
     if not target:
@@ -56,8 +56,9 @@ async def update_target(target_id:UUID, session:AsyncSession= Depends(get_sessio
     await session.refresh(target)
     return target
 
+
 @router.delete("/{target_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_target(target_id:UUID, session:AsyncSession = Depends(get_session)) ->None:
+async def delete_target(target_id: UUID, session: AsyncSession = Depends(get_session)) -> None:
     repo = TargetRepository(session)
     target = await repo.get_by_id(target_id)
     if not target:

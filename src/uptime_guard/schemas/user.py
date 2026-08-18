@@ -9,16 +9,16 @@ class UserCreate(BaseModel):
     telegram_id: int
     username: str | None = None
 
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id:UUID
-    telegram_id:int
-    username:str|None
-    is_active:bool
+    id: UUID
+    telegram_id: int
+    username: str | None
+    is_active: bool
     created_at: datetime
+
 
 class UserStats(BaseModel):
     total_targets: int
-
-
