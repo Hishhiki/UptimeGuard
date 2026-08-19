@@ -9,21 +9,16 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from uptime_guard.config import settings
 from uptime_guard.models import Base
 
-# Alembic Config
 config = context.config
 
-# Берем URL базы данных из .env через наш settings
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-
-# Передаем метаданные моделей (User, Target, CheckLog) для автогенерации
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """Офлайн режим (генерация SQL скриптов без подключения к БД)"""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -37,7 +32,6 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    """Выполнение миграции внутри асинхронного соединения"""
     context.configure(connection=connection, target_metadata=target_metadata)
 
     with context.begin_transaction():
@@ -45,7 +39,6 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    """Создание асинхронного движка и запуск миграций"""
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -59,7 +52,6 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    """Онлайн режим (выполнение миграций в базе данных)"""
     asyncio.run(run_async_migrations())
 
 

@@ -1,10 +1,12 @@
-from starlette.requests import ClientDisconnect
+import uuid
 import asyncio
-from datetime import datetime, timezone
 import time
 import httpx
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from telegram import Bot
+from telegram.error import TelegramError
+
+from uptime_guard.config import settings
 from uptime_guard.database import session_factory
 from uptime_guard.models.check_log import CheckLog
 from uptime_guard.models.target import Target
@@ -16,6 +18,8 @@ class CheckerService:
     def __init__(self, concurrency_limit: int = 50):
         self.semaphore = asyncio.Semaphore(concurrency_limit)
         self.is_running = False
+        self.last_status: dict[uuid.UUID, bool] = {}
+        self.bot = Bot(token=settings.telegram_bot_token)
 
     async def start(self) -> None:
         self.is_running = True
@@ -64,6 +68,15 @@ class CheckerService:
             code_text = status_code if status_code else "ERROR"
             print(f"[{status_emoji}] {target.url} | Code: {code_text} | Time: {response_time_ms:.0f}ms")
 
+            previous_status = self.last_status.get(target.id)
+            
+            if previous_status is not None and previous_status != is_success:
+                await self._send_notification(target, is_success, status_code, error_message)
+            elif previous_status is None and not is_success:
+                await self._send_notification(target, is_success, status_code, error_message)
+
+            self.last_status[target.id] = is_success
+
             log = CheckLog(
                 target_id=target.id,
                 status_code=status_code,
@@ -72,6 +85,27 @@ class CheckerService:
                 error_message=error_message
             )  
 
+            from sqlalchemy.exc import IntegrityError
+            
             async with session_factory() as log_session:
                 log_repo = CheckLogRepository(log_session)
-                await log_repo.create(log)
+                try:
+                    await log_repo.create(log)
+                except IntegrityError:
+
+                    self.last_status.pop(target.id, None)
+
+    async def _send_notification(self, target: Target, is_success: bool, status_code: int | None, error_message: str | None) -> None:
+        if not target.user or not target.user.telegram_id:
+            return
+
+        if is_success:
+            text = f"Сайт восстановлен!*\n\n🔗 {target.url}\nКод: {status_code}"
+        else:
+            reason = f"Код {status_code}" if status_code else error_message
+            text = f"САЙТ УПАЛ!*\n\n🔗 {target.url}\nПричина: {reason}"
+
+        try:
+            await self.bot.send_message(chat_id=target.user.telegram_id, text=text, parse_mode="Markdown")
+        except TelegramError as e:
+            print(f"Failed to send alert to {target.user.telegram_id}: {e}")

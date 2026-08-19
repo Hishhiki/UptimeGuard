@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from uptime_guard.models.target import Target
@@ -12,11 +13,11 @@ class TargetRepository(BaseRepository[Target]):
         super().__init__(model=Target, session=session)
 
     async def get_by_user_id(self, user_id: UUID) -> list[Target]:
-        stmt = select(Target).where(Target.user_id == user_id)
+        stmt = select(Target).where(Target.user_id == user_id).options(selectinload(Target.user))
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     async def get_active_targets(self) -> list[Target]:
-        stmt = select(Target).where(Target.is_active.is_(True))
+        stmt = select(Target).where(Target.is_active.is_(True)).options(selectinload(Target.user))
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
