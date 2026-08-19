@@ -15,7 +15,6 @@ async def lifespan(app:FastAPI):
     task = asyncio.create_task(checker_service.start())
     print("Service started")
 
-    # Инициализируем и запускаем Телеграм бота
     bot_app = setup_bot()
     await bot_app.initialize()
     await bot_app.start()

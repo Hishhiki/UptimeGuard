@@ -7,7 +7,7 @@ from telegram import Bot
 from telegram.error import TelegramError
 
 from uptime_guard.config import settings
-from uptime_guard.database import session_factory
+from uptime_guard.database import session_factory, redis_client
 from uptime_guard.models.check_log import CheckLog
 from uptime_guard.models.target import Target
 from uptime_guard.repositories.check_log import CheckLogRepository
@@ -18,7 +18,6 @@ class CheckerService:
     def __init__(self, concurrency_limit: int = 50):
         self.semaphore = asyncio.Semaphore(concurrency_limit)
         self.is_running = False
-        self.last_status: dict[uuid.UUID, bool] = {}
         self.bot = Bot(token=settings.telegram_bot_token)
 
     async def start(self) -> None:
@@ -68,14 +67,21 @@ class CheckerService:
             code_text = status_code if status_code else "ERROR"
             print(f"[{status_emoji}] {target.url} | Code: {code_text} | Time: {response_time_ms:.0f}ms")
 
-            previous_status = self.last_status.get(target.id)
+            # Логика алертов
+            previous_status_str = await redis_client.get(f"status:{target.id}")
+            previous_status = (previous_status_str == "1") if previous_status_str is not None else None
             
             if previous_status is not None and previous_status != is_success:
                 await self._send_notification(target, is_success, status_code, error_message)
             elif previous_status is None and not is_success:
                 await self._send_notification(target, is_success, status_code, error_message)
 
-            self.last_status[target.id] = is_success
+            # Обновление Redis
+            await redis_client.set(f"status:{target.id}", "1" if is_success else "0")
+            await redis_client.incr(f"stats:total:{target.id}")
+            if is_success:
+                await redis_client.incr(f"stats:success:{target.id}")
+            await redis_client.set(f"stats:last_ping:{target.id}", int(response_time_ms))
 
             log = CheckLog(
                 target_id=target.id,
@@ -92,8 +98,12 @@ class CheckerService:
                 try:
                     await log_repo.create(log)
                 except IntegrityError:
-
-                    self.last_status.pop(target.id, None)
+                    await redis_client.delete(
+                        f"status:{target.id}", 
+                        f"stats:total:{target.id}", 
+                        f"stats:success:{target.id}", 
+                        f"stats:last_ping:{target.id}"
+                    )
 
     async def _send_notification(self, target: Target, is_success: bool, status_code: int | None, error_message: str | None) -> None:
         if not target.user or not target.user.telegram_id:
